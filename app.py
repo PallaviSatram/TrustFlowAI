@@ -6,6 +6,8 @@ from dotenv import load_dotenv
 from google import genai
 
 from tools import list_failed_builds
+from pydantic import ValidationError
+from validation import RequestResult
 
 # Load the API key
 load_dotenv()
@@ -68,8 +70,15 @@ def handle_request(user_request):
     """Validate the AI result and run the appropriate Python tool."""
     result = understand_request(user_request)
 
-    action = result.get("action")
-    service = normalize_service(result.get("service"))
+    try:
+        validated_result = RequestResult.model_validate(result)
+    except ValidationError as error:
+        print("\nGemini returned an invalid response.")
+        print(error)
+        return
+
+    action = validated_result.action
+    service = validated_result.service
 
     # Only allow actions our application supports
     if action != "list_failed_builds":

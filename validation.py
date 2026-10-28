@@ -1,7 +1,7 @@
 from typing import Literal
 from pydantic import BaseModel, ValidationError, field_validator
 
-class RequestResult(BaseModel):
+class RequestResult(BaseModel): # validation model
   action: Literal["list_failed_builds", "unknown"]
   service: Literal["payment-service", "user-service"] | None = None
 
@@ -23,32 +23,33 @@ class RequestResult(BaseModel):
     return value
   
 # Test data — no Gemini request required
-test_cases = [
-    {
+if __name__ == "__main__":
+  test_cases = [
+      {
+          "action": "list_failed_builds",
+          "service": "payment",
+      },
+      {
+          "action": "list_failed_builds",
+          "service": "user-service",
+      },
+      {
+          "action": "unknown",
+          "service": None,
+      },
+      {
         "action": "list_failed_builds",
-        "service": "payment",
-    },
-    {
-        "action": "list_failed_builds",
-        "service": "user-service",
-    },
-    {
-        "action": "unknown",
-        "service": None,
-    },
-    {
-      "action": "list_failed_builds",
-      "service": "customer-service"
-    },
-    {
-      "action": "list_sucess_builds",
-      "service": "customer-service"
-    }
-]
+        "service": "customer-service"
+      },
+      {
+        "action": "list_sucess_builds",
+        "service": "customer-service"
+      }
+  ]
 
-for data in test_cases:
-  try:
-    result = RequestResult.model_validate(data)
-    print("VALID:", result.model_dump())
-  except ValidationError as error:
-    print("INVALID:", error)
+  for data in test_cases:
+    try:
+      result = RequestResult.model_validate(data)
+      print("VALID:", result.model_dump())
+    except ValidationError as error:
+      print("INVALID:", error)
