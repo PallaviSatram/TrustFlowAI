@@ -1,4 +1,4 @@
-
+import logging
 import json
 import os
 
@@ -8,6 +8,15 @@ from google import genai
 from tools import list_failed_builds
 from pydantic import ValidationError
 from validation import RequestResult
+
+logging.basicConfig(
+    level=logging.INFO, # records informational events and more serious warnings or errors
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    # includes the timestamp, severity level, and message.
+)
+
+logger = logging.getLogger(__name__)
+# creates a logger associated with this python module
 
 # Load the API key
 load_dotenv()
@@ -56,19 +65,37 @@ def understand_request(user_request):
 
     Developer request: {user_request}
     """
-
-    response = client.models.generate_content(
-        model="gemini-flash-latest",
-        contents=prompt,
-        config={"response_mime_type": "application/json"},
-    )
-
-    return json.loads(response.text)
+    try:
+        response = client.models.generate_content(
+            model="gemini-flash-latest",
+            contents=prompt,
+            config={"response_mime_type": "application/json"},
+        )
+    except Exception as error:
+        raise RuntimeError("Gemini API request failed.") from error
+    
+    try:
+        return json.loads(response.text)
+    except json.JSONDecodeError as error:
+        raise ValueError(
+            "Gemini returned an invalid JSON response"
+        ) from error
 
 
 def handle_request(user_request):
     """Validate the AI result and run the appropriate Python tool."""
-    result = understand_request(user_request)
+    
+    logger.info("Processing a developer request.")
+    try:
+        result = understand_request(user_request)
+    # represents a failed API Request
+    except RuntimeError as error:
+        print(f"\nCould not get a response from Gemini: {error}")
+        return
+    # represents an Invalid JSON response
+    except ValueError as error:
+        print(f"\nCould not understand the AI response: {error}")
+        return
 
     try:
         validated_result = RequestResult.model_validate(result)
@@ -91,14 +118,23 @@ def handle_request(user_request):
     if service is not None and service not in allowed_services:
         print("\nUnknown service. Please specify payment-service or user-service.")
         return
-
+    
+    logger.info("Executing tool: list_failed_builds")
     # Run our existing Python function
-    failed_builds = list_failed_builds(service)
-
-    if not failed_builds:
-        print("\nNo failed builds found for that request.")
+    try:
+        logger.info("Executing tool: list_failed_builds")
+        failed_builds = list_failed_builds(service)
+    except ValueError:
+        logger.exception("Failed to retrieve failed builds")
+        print("\nCould not retrieve failed builds. Please check the service and try again.")
         return
 
+    if not failed_builds:
+        logger.info("Tool completed: no failed builds found.")
+        print("\nNo failed builds found for that request.")
+        return
+    
+    logger.info("Tool completed: found %d failed build(s).", len(failed_builds))
     print("\nFailed builds found:")
 
     for build in failed_builds:

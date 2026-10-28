@@ -37,14 +37,16 @@ if __name__ == "__main__":
           "action": "unknown",
           "service": None,
       },
+      
       {
-        "action": "list_failed_builds",
-        "service": "customer-service"
+          "action": "delete_all_builds",
+          "service": "payment-service",
       },
       {
-        "action": "list_sucess_builds",
-        "service": "customer-service"
-      }
+          "action": "list_failed_builds",
+          "service": "admin-service",
+      },
+
   ]
 
   for data in test_cases:
