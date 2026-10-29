@@ -5,7 +5,12 @@ import os
 from dotenv import load_dotenv
 from google import genai
 
-from tools import ALLOWED_SERVICES, list_failed_builds
+from tools import (
+ALLOWED_SERVICES, 
+list_failed_builds,
+get_deploy_status
+)
+
 from pydantic import ValidationError
 from validation import RequestResult
 
@@ -17,6 +22,7 @@ logging.basicConfig(
 
 TOOL_REGISTRY = {
     "list_failed_builds": list_failed_builds,
+    "get_deploy_status": get_deploy_status
 }
 
 logger = logging.getLogger(__name__)
@@ -53,19 +59,30 @@ def understand_request(user_request):
     prompt = f"""
     You are the request-understanding assistant for TrustFlow AI.
 
-    Read the developer request and return a JSON object with:
+    Read the developer's request and return a JSON object with:
     - action
     - service
 
-    The only supported action is list_failed_builds.
+    Supported actions:
 
-    If the request asks to list failed builds:
-    - action must be "list_failed_builds"
-    - service must be the service name if mentioned, otherwise null
+    1. list_failed_builds
+    Use this when the developer asks to list or show failed builds.
+
+    2. get_deploy_status
+    Use this when the developer asks for the deployment status
+    or deployment version of a service.
+
+    For either supported action:
+    - Set action to the appropriate action name.
+    - Set service to "payment-service" or "user-service"
+    if the service is mentioned.
+    - Set service to null if no service is mentioned.
 
     For unrelated requests:
-    - action must be "unknown"
-    - service must be null
+    - Set action to "unknown".
+    - Set service to null.
+
+    Return only the JSON object.
 
     Developer request: {user_request}
     """
@@ -122,29 +139,50 @@ def handle_request(user_request):
         print("\nUnknown service. Please specify payment-service or user-service.")
         return
     
-    logger.info("Executing tool: list_failed_builds")
-    # Run our existing Python function
+    # A deployment-status request requires a specific service.
+    if action == "get_deploy_status" and service is None:
+        print("\nPlease specify a service: payment-service or user-service.")
+        return
+
+    # Execute the selected tool.
     try:
         logger.info("Executing tool: %s", action)
-        failed_builds = tool_function(service)
+        tool_result = tool_function(service)
     except ValueError:
-        logger.exception("Failed to retrieve failed builds")
-        print("\nCould not retrieve failed builds. Please check the service and try again.")
-        return
-
-    if not failed_builds:
-        logger.info("Tool completed: no failed builds found.")
-        print("\nNo failed builds found for that request.")
+        logger.exception("Tool execution failed for action: %s", action)
+        print("\nCould not complete the request. Please check the service and try again.")
         return
     
-    logger.info("Tool completed: found %d failed build(s).", len(failed_builds))
-    print("\nFailed builds found:")
+    # Format the result according to the selected action.
+    if action == "list_failed_builds":
+        if not tool_result:
+            logger.info("Tool completed: no failed builds found.")
+            print("\nNo failed builds found for that request.")
+            return
+    
+        logger.info("Tool completed: found %d failed build(s).", len(tool_result))
+        print("\nFailed builds found:")
 
-    for build in failed_builds:
-        print(f"\nBuild ID: {build['build_id']}")
-        print(f"Service: {build['service']}")
-        print(f"Error: {build['error']}")
+        for build in tool_result:
+            print(f"\nBuild ID: {build['build_id']}")
+            print(f"Service: {build['service']}")
+            print(f"Error: {build['error']}")
+            
+    elif action == "get_deploy_status":
+        if tool_result is None:
+            logger.info("Tool completed: no deployment record found.")
+            print("\nNo deployment information found for that service.")
+            return
 
+        logger.info(
+            "Tool completed: deployment status retrieved for %s.",
+            service,
+        )
+
+        print("\nDeployment Status:")
+        print(f"Service: {tool_result['service']}")
+        print(f"Status: {tool_result['status']}")
+        print(f"Version: {tool_result['version']}")
 
 if __name__ == "__main__":
     request = input("TrustFlow AI — Enter a developer request: ")

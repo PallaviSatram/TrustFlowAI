@@ -136,9 +136,47 @@ def test_tool_error_is_handled_gracefully(monkeypatch, capsys):
     app.handle_request("Show failed payment builds")
 
     output = capsys.readouterr().out
-    assert "Could not retrieve failed builds" in output
+    assert "Could not complete the request" in output
 
 def test_unknown_action_does_not_select_a_tool():
     tool_function = app.TOOL_REGISTRY.get("unknown")
 
     assert tool_function is None
+    
+def test_deployment_status_is_displayed(monkeypatch, capsys):
+    monkeypatch.setattr(
+        app,
+        "understand_request",
+        lambda user_request : {
+            "action": "get_deploy_status",
+            "service": "payment-service",
+        }
+    )
+    
+    app.handle_request("show payment deployment status")
+    
+    output = capsys.readouterr().out
+    
+    assert "Deployment Status:" in output
+    assert "payment-service" in output
+    assert "deployed" in output
+    assert "v1.4.2" in output
+
+
+def test_deployment_status_requires_service(monkeypatch, capsys):
+    # Simulate Gemini returning no service.
+    monkeypatch.setattr(
+        app,
+        "understand_request",
+        lambda user_request: {
+            "action": "get_deploy_status",
+            "service": None,
+        },
+    )
+
+    app.handle_request("Show deployment status")
+
+    output = capsys.readouterr().out
+
+    assert "Please specify a service" in output
+

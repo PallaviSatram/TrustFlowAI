@@ -3,6 +3,19 @@ ALLOWED_SERVICES = {
     "user-service",
 }
 
+deployments = [
+    {
+        "service": "payment-service",
+        "status": "deployed",
+        "version": "v1.4.2",
+    },
+    {
+        "service": "user-service",
+        "status": "in_progress",
+        "version": "v2.1.0",
+    },
+]
+
 # Sample build data for our TrustFlow AI project
 builds = [
     {
@@ -40,3 +53,15 @@ def list_failed_builds(service = None):
               failed_builds.append(build)
 
     return failed_builds
+
+def get_deploy_status(service):
+    """Return the deployment status for a supported service."""
+    
+    if service not in ALLOWED_SERVICES:
+        raise ValueError(f"Unsupported service: {service}")
+     
+    for deployment in deployments:
+        if deployment["service"] == service:
+            return deployment
+        
+    return None

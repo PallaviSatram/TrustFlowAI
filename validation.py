@@ -2,7 +2,11 @@ from typing import Literal
 from pydantic import BaseModel, ValidationError, field_validator
 
 class RequestResult(BaseModel): # validation model
-  action: Literal["list_failed_builds", "unknown"]
+  action: Literal[
+    "list_failed_builds",
+    "get_deploy_status",
+    "unknown",
+  ]
   service: Literal["payment-service", "user-service"] | None = None
 
   @field_validator("service", mode="before")
