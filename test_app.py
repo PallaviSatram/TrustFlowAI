@@ -38,11 +38,14 @@ def test_invalid_json_does_not_execute_tool(monkeypatch, capsys):
     class FakeResponse:
         text = "this is not valid JSON"
 
-    monkeypatch.setattr(
-        app.client.models,
-        "generate_content",
-        lambda **kwargs: FakeResponse(),
-    )
+    class FakeModels:
+        def generate_content(self, **kwargs):
+            return FakeResponse()
+
+    class FakeClient:
+        models = FakeModels()
+
+    monkeypatch.setattr(app, "client", FakeClient())
 
     def unexpected_tool_call(service=None):
         raise AssertionError("The tool should not have been executed!")
@@ -63,11 +66,14 @@ def test_gemini_api_failure_is_handled(monkeypatch, capsys):
     def simulate_api_failure(**kwargs):
         raise Exception("Simulated network failure")
 
-    monkeypatch.setattr(
-        app.client.models,
-        "generate_content",
-        simulate_api_failure,
-    )
+    class FakeModels:
+        def generate_content(self, **kwargs):
+            return simulate_api_failure(**kwargs)
+
+    class FakeClient:
+        models = FakeModels()
+
+    monkeypatch.setattr(app, "client", FakeClient())
 
     def unexpected_tool_call(service=None):
         raise AssertionError("The tool should not have been executed!")
