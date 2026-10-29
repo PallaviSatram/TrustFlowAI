@@ -1,3 +1,7 @@
+ALLOWED_SERVICES = {
+    "payment-service",
+    "user-service",
+}
 
 # Sample build data for our TrustFlow AI project
 builds = [
@@ -24,8 +28,7 @@ builds = [
 
 def list_failed_builds(service = None):
     """Return failed builds, optionally filtered by service."""
-    allowed_services = {"payment-service", "user-service"}
-    if service is not None and service not in allowed_services:
+    if service is not None and service not in ALLOWED_SERVICES:
         raise ValueError(
             f"Unsupported service: {service}"
         )

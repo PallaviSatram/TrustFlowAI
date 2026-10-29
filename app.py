@@ -5,7 +5,7 @@ import os
 from dotenv import load_dotenv
 from google import genai
 
-from tools import list_failed_builds
+from tools import ALLOWED_SERVICES, list_failed_builds
 from pydantic import ValidationError
 from validation import RequestResult
 
@@ -14,6 +14,10 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s",
     # includes the timestamp, severity level, and message.
 )
+
+TOOL_REGISTRY = {
+    "list_failed_builds": list_failed_builds,
+}
 
 logger = logging.getLogger(__name__)
 # creates a logger associated with this python module
@@ -106,24 +110,23 @@ def handle_request(user_request):
 
     action = validated_result.action
     service = validated_result.service
-
+    
+    tool_function = TOOL_REGISTRY.get(action)
+    
     # Only allow actions our application supports
-    if action != "list_failed_builds":
+    if tool_function is None:
         print("\nSorry, TrustFlow AI does not support that request yet.")
         return
 
-    # Only accept known service names
-    allowed_services = {"payment-service", "user-service"}
-
-    if service is not None and service not in allowed_services:
+    if service is not None and service not in ALLOWED_SERVICES:
         print("\nUnknown service. Please specify payment-service or user-service.")
         return
     
     logger.info("Executing tool: list_failed_builds")
     # Run our existing Python function
     try:
-        logger.info("Executing tool: list_failed_builds")
-        failed_builds = list_failed_builds(service)
+        logger.info("Executing tool: %s", action)
+        failed_builds = tool_function(service)
     except ValueError:
         logger.exception("Failed to retrieve failed builds")
         print("\nCould not retrieve failed builds. Please check the service and try again.")

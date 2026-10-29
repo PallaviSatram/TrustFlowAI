@@ -19,13 +19,12 @@ def test_unknown_action_does_not_execute_tool(monkeypatch, capsys):
   # If the tool is called, the test must fail
   def unexpected_tool_call(service=None):
     raise AssertionError("The tool should not have been executed!")
-  
-  monkeypatch.setattr(
-    app,
+
+  monkeypatch.setitem(
+    app.TOOL_REGISTRY,
     "list_failed_builds",
     unexpected_tool_call,
   )
-
   # Process the request.
   app.handle_request("Tell me a joke")
   # Check the message displayed by the application.
@@ -48,8 +47,8 @@ def test_invalid_json_does_not_execute_tool(monkeypatch, capsys):
     def unexpected_tool_call(service=None):
         raise AssertionError("The tool should not have been executed!")
 
-    monkeypatch.setattr(
-        app,
+    monkeypatch.setitem(
+        app.TOOL_REGISTRY,
         "list_failed_builds",
         unexpected_tool_call,
     )
@@ -73,8 +72,8 @@ def test_gemini_api_failure_is_handled(monkeypatch, capsys):
     def unexpected_tool_call(service=None):
         raise AssertionError("The tool should not have been executed!")
 
-    monkeypatch.setattr(
-        app,
+    monkeypatch.setitem(
+        app.TOOL_REGISTRY,
         "list_failed_builds",
         unexpected_tool_call,
     )
@@ -94,8 +93,8 @@ def test_tool_execution_is_logged(monkeypatch, caplog):
         },
     )
 
-    monkeypatch.setattr(
-        app,
+    monkeypatch.setitem(
+        app.TOOL_REGISTRY,
         "list_failed_builds",
         lambda service=None: [
             {
@@ -128,8 +127,8 @@ def test_tool_error_is_handled_gracefully(monkeypatch, capsys):
     def simulate_tool_error(service=None):
         raise ValueError("Simulated tool failure")
 
-    monkeypatch.setattr(
-        app,
+    monkeypatch.setitem(
+        app.TOOL_REGISTRY,
         "list_failed_builds",
         simulate_tool_error,
     )
@@ -138,3 +137,8 @@ def test_tool_error_is_handled_gracefully(monkeypatch, capsys):
 
     output = capsys.readouterr().out
     assert "Could not retrieve failed builds" in output
+
+def test_unknown_action_does_not_select_a_tool():
+    tool_function = app.TOOL_REGISTRY.get("unknown")
+
+    assert tool_function is None
