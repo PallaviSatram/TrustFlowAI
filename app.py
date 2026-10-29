@@ -32,10 +32,9 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 api_key = os.getenv("GEMINI_API_KEY")
 
-if not api_key:
-    raise SystemExit("Error: Gemini API key not found in .env")
 
-client = genai.Client(api_key=api_key)
+
+client = genai.Client(api_key=api_key) if api_key else None
 
 def normalize_service(service):
     """Convert short service names into the names used by our data."""
@@ -86,6 +85,10 @@ def understand_request(user_request):
 
     Developer request: {user_request}
     """
+    if client is None:
+        raise RuntimeError(
+        "Gemini API key is missing. Add GEMINI_API_KEY to your .env file."
+        )
     try:
         response = client.models.generate_content(
             model="gemini-flash-latest",

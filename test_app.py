@@ -180,3 +180,92 @@ def test_deployment_status_requires_service(monkeypatch, capsys):
 
     assert "Please specify a service" in output
 
+def test_deployment_request_calls_correct_tool(monkeypatch, capsys):
+    monkeypatch.setattr(
+        app,
+        "understand_request",
+        lambda user_request : {
+            "action": "get_deploy_status",
+            "service": "payment-service",
+        },
+    )
+    
+    # Record the arguments passed to the deployment tool
+    
+    called_with = []
+    
+    def fake_deploy_tool(service):
+        called_with.append(service)
+        return {
+            "service": service,
+            "status": "deployed",
+            "version": "v1.4.2",
+        }
+    
+    monkeypatch.setitem(
+        app.TOOL_REGISTRY,
+        "get_deploy_status",
+        fake_deploy_tool
+    )
+    
+    app.handle_request("Show payment deployment status")
+    
+    # Verify that the correct tool received the correct service.
+    assert called_with == ["payment-service"]
+    
+    output = capsys.readouterr().out
+    assert "Deployment Status:" in output
+    
+
+def test_unsupported_service_does_not_execute_tool(monkeypatch, capsys):
+    # Simulate a response containing an unsupported service.
+    monkeypatch.setattr(
+        app,
+        "understand_request",
+        lambda user_request: {
+            "action": "list_failed_builds",
+            "service": "admin-service",
+        },
+    )
+
+    # Fail the test if the tool is executed.
+    def unexpected_tool_call(service=None):
+        raise AssertionError("The tool should not have been executed!")
+
+    monkeypatch.setitem(
+        app.TOOL_REGISTRY,
+        "list_failed_builds",
+        unexpected_tool_call,
+    )
+
+    app.handle_request("Show failed builds for admin")
+
+    output = capsys.readouterr().out
+
+    assert "Gemini returned an invalid response" in output
+    
+
+def test_no_failed_builds_displays_helpful_message(monkeypatch, capsys):
+    # Simulate Gemini identifying a request to list failed builds.
+    monkeypatch.setattr(
+        app,
+        "understand_request",
+        lambda user_request: {
+            "action": "list_failed_builds",
+            "service": "user-service",
+        },
+    )
+
+    # Simulate a service with no failed builds.
+    monkeypatch.setitem(
+        app.TOOL_REGISTRY,
+        "list_failed_builds",
+        lambda service=None: [],
+    )
+
+    app.handle_request("Show failed builds for user-service")
+
+    output = capsys.readouterr().out
+
+    assert "No failed builds found" in output
+
