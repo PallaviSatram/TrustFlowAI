@@ -8,7 +8,8 @@ from google import genai
 from tools import (
 ALLOWED_SERVICES, 
 list_failed_builds,
-get_deploy_status
+get_deploy_status,
+get_recent_workflow_runs,
 )
 
 from pydantic import ValidationError
@@ -22,7 +23,8 @@ logging.basicConfig(
 
 TOOL_REGISTRY = {
     "list_failed_builds": list_failed_builds,
-    "get_deploy_status": get_deploy_status
+    "get_deploy_status": get_deploy_status,
+    "get_recent_workflow_runs": get_recent_workflow_runs,
 }
 
 logger = logging.getLogger(__name__)
@@ -66,10 +68,14 @@ def understand_request(user_request):
 
     1. list_failed_builds
     Use this when the developer asks to list or show failed builds.
-
-    2. get_deploy_status
-    Use this when the developer asks for the deployment status
-    or deployment version of a service.
+    2. get_deploy_status 
+    Use this when the developer asks for the deployment status or deployment version of a service. 
+    3. get_recent_workflow_runs
+    Use this when the developer asks to:
+    - Show recent GitHub Actions workflow runs.
+    - List successful or failed workflow runs.
+    - Check the status of recent CI runs.
+    For this action, set service to null.
 
     For either supported action:
     - Set action to the appropriate action name.
@@ -151,9 +157,9 @@ def handle_request(user_request):
     try:
         logger.info("Executing tool: %s", action)
         tool_result = tool_function(service)
-    except ValueError:
+    except (ValueError, RuntimeError):
         logger.exception("Tool execution failed for action: %s", action)
-        print("\nCould not complete the request. Please check the service and try again.")
+        print("\nCould not complete the request. Please check the service or try again later.")
         return
     
     # Format the result according to the selected action.
@@ -186,6 +192,27 @@ def handle_request(user_request):
         print(f"Service: {tool_result['service']}")
         print(f"Status: {tool_result['status']}")
         print(f"Version: {tool_result['version']}")
+    elif action == "get_recent_workflow_runs":
+        if not tool_result:
+            logger.info("No GitHub Actions workflow runs found.")
+            print("\nNo GitHub Actions workflow runs found.")
+            return
+
+        logger.info(
+            "Retrieved %d GitHub Actions workflow run(s).",
+            len(tool_result),
+        )
+
+        print("\nRecent GitHub Actions Workflow Runs:")
+
+        for run in tool_result:
+            print(f"\nWorkflow: {run['name']}")
+            print(f"Run ID: {run['run_id']}")
+            print(f"Status: {run['status']}")
+            print(f"Conclusion: {run['conclusion'] or 'Not completed'}")
+            print(f"Branch: {run['branch']}")
+            print(f"URL: {run['url']}")
+
 
 if __name__ == "__main__":
     request = input("TrustFlow AI — Enter a developer request: ")

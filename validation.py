@@ -5,6 +5,7 @@ class RequestResult(BaseModel): # validation model
   action: Literal[
     "list_failed_builds",
     "get_deploy_status",
+    "get_recent_workflow_runs",
     "unknown",
   ]
   service: Literal["payment-service", "user-service"] | None = None

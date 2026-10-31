@@ -38,7 +38,6 @@ builds = [
     }
 ]
 
-
 def list_failed_builds(service = None):
     """Return failed builds, optionally filtered by service."""
     if service is not None and service not in ALLOWED_SERVICES:
