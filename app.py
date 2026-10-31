@@ -1,9 +1,7 @@
 import logging
-import json
-import os
 
-from dotenv import load_dotenv
-from google import genai
+from understand_request import understand_request
+from tools.workflow_analysis import analyze_latest_failed_workflow
 
 from tools import (
 ALLOWED_SERVICES, 
@@ -25,19 +23,11 @@ TOOL_REGISTRY = {
     "list_failed_builds": list_failed_builds,
     "get_deploy_status": get_deploy_status,
     "get_recent_workflow_runs": get_recent_workflow_runs,
+    "analyze_latest_failed_workflow": analyze_latest_failed_workflow,
 }
 
 logger = logging.getLogger(__name__)
 # creates a logger associated with this python module
-
-# Load the API key
-load_dotenv()
-api_key = os.getenv("GEMINI_API_KEY")
-
-
-
-client = genai.Client(api_key=api_key) if api_key else None
-
 def normalize_service(service):
     """Convert short service names into the names used by our data."""
     if not service:
@@ -53,63 +43,6 @@ def normalize_service(service):
     }
 
     return aliases.get(service, service)
-
-
-def understand_request(user_request):
-    """Ask Gemini to identify the intended action and service."""
-    prompt = f"""
-    You are the request-understanding assistant for TrustFlow AI.
-
-    Read the developer's request and return a JSON object with:
-    - action
-    - service
-
-    Supported actions:
-
-    1. list_failed_builds
-    Use this when the developer asks to list or show failed builds.
-    2. get_deploy_status 
-    Use this when the developer asks for the deployment status or deployment version of a service. 
-    3. get_recent_workflow_runs
-    Use this when the developer asks to:
-    - Show recent GitHub Actions workflow runs.
-    - List successful or failed workflow runs.
-    - Check the status of recent CI runs.
-    For this action, set service to null.
-
-    For either supported action:
-    - Set action to the appropriate action name.
-    - Set service to "payment-service" or "user-service"
-    if the service is mentioned.
-    - Set service to null if no service is mentioned.
-
-    For unrelated requests:
-    - Set action to "unknown".
-    - Set service to null.
-
-    Return only the JSON object.
-
-    Developer request: {user_request}
-    """
-    if client is None:
-        raise RuntimeError(
-        "Gemini API key is missing. Add GEMINI_API_KEY to your .env file."
-        )
-    try:
-        response = client.models.generate_content(
-            model="gemini-flash-latest",
-            contents=prompt,
-            config={"response_mime_type": "application/json"},
-        )
-    except Exception as error:
-        raise RuntimeError("Gemini API request failed.") from error
-    
-    try:
-        return json.loads(response.text)
-    except json.JSONDecodeError as error:
-        raise ValueError(
-            "Gemini returned an invalid JSON response"
-        ) from error
 
 
 def handle_request(user_request):
@@ -156,7 +89,10 @@ def handle_request(user_request):
     # Execute the selected tool.
     try:
         logger.info("Executing tool: %s", action)
-        tool_result = tool_function(service)
+        if action == "analyze_latest_failed_workflow":
+            tool_result = tool_function()
+        else:
+            tool_result = tool_function(service)
     except (ValueError, RuntimeError):
         logger.exception("Tool execution failed for action: %s", action)
         print("\nCould not complete the request. Please check the service or try again later.")
@@ -212,6 +148,63 @@ def handle_request(user_request):
             print(f"Conclusion: {run['conclusion'] or 'Not completed'}")
             print(f"Branch: {run['branch']}")
             print(f"URL: {run['url']}")
+            
+    elif action == "analyze_latest_failed_workflow":
+        if not tool_result["workflow"]:
+            logger.info(tool_result["message"])
+            print(f"\n{tool_result['message']}")
+            return
+        
+        workflow = tool_result["workflow"]
+        jobs = tool_result["jobs"]
+        
+        logger.info("Analyzed failed workflow run %s.", workflow["run_id"])
+        
+        print("\nTrustFlow AI — Workflow Analysis")
+        print(f"\nWorkflow: {workflow['name']}")
+        print(f"Run ID: {workflow['run_id']}")
+        print(f"Status: {workflow['status']}")
+        print(f"Conclusion: {workflow['conclusion']}")
+        print(f"Branch: {workflow['branch']}")
+        print(f"URL: {workflow['url']}")
+        
+        if not jobs:
+            print("\nNo jobs were available to analyze.")
+            return
+        
+        for job in jobs:
+            print(f"\n{'=' * 50}")
+            print(f"Job: {job['job_name']}")
+            print(f"Status: {job['status']}")
+            print(f"Conclusion: {job['conclusion'] or 'Not completed'}")
+
+            if not job["needs_analysis"]:
+                print("\nNo failure analysis needed for this job.")
+                continue
+
+            if job["context"]:
+                print("\nFailure Context:")
+                print(job["context"])
+
+            explanation = job["explanation"]
+
+            if explanation:
+                print("\nLikely Cause:")
+                print(explanation["likely_cause"])
+
+                print("\nEvidence:")
+                for item in explanation["evidence"]:
+                    print(f"- {item}")
+
+                print("\nSuggested Fix:")
+                print(explanation["suggested_fix"])
+
+                print(
+                    f"\nConfidence: "
+                    f"{explanation['confidence'].upper()}"
+                )
+
+        
 
 
 if __name__ == "__main__":

@@ -6,6 +6,7 @@ class RequestResult(BaseModel): # validation model
     "list_failed_builds",
     "get_deploy_status",
     "get_recent_workflow_runs",
+    "analyze_latest_failed_workflow",
     "unknown",
   ]
   service: Literal["payment-service", "user-service"] | None = None

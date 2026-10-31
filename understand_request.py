@@ -1,4 +1,3 @@
-
 import os
 import json
 from dotenv import load_dotenv
@@ -8,57 +7,70 @@ from google import genai
 load_dotenv()
 api_key = os.getenv("GEMINI_API_KEY")
 
-if not api_key:
-    print("Error: Gemini API key not found.")
-    raise SystemExit(1)
+client = genai.Client(api_key=api_key) if api_key else None
 
-client = genai.Client(api_key=api_key)
+def understand_request(user_request):
+    """Ask Gemini to identify the intended action and service."""
+    prompt = f"""
+    You are the request-understanding assistant for TrustFlow AI.
 
-# Get a request from the developer
-user_request = input("Enter a developer request: ")
+    Read the developer's request and return a JSON object with:
+    - action
+    - service
 
-# Tell Gemini how to understand the request
-prompt = f"""
-You are the request-understanding assistant for TrustFlow AI.
+    Supported actions:
 
-Read the developer's request and identify:
-1. The intended action.
-2. The service name, if mentioned.
+    1. list_failed_builds
+    Use this when the developer asks to list or show failed builds.
+    2. get_deploy_status 
+    Use this when the developer asks for the deployment status or deployment version of a service. 
+    3. get_recent_workflow_runs
+    Use this when the developer asks to:
+    - Show recent GitHub Actions workflow runs.
+    - List successful or failed workflow runs.
+    - Check the status of recent CI runs.
+    For this action, set service to null.
+    4. analyze_latest_failed_workflow
+    Use this when the developer asks to:
+    - Analyze the latest failed GitHub Actions workflow.
+    - Explain why a workflow or CI run failed.
+    - Identify failed job errors and suggest fixes.
+    For this action, set service to null.
 
-The only supported action is:
-list_failed_builds
+    For any supported action:
+    - Set action to the appropriate action name.
+    - Set service to "payment-service" or "user-service"
+    if the service is mentioned.
+    - Set service to null if no service is mentioned.
 
-If the request asks to list failed builds:
-- Set action to "list_failed_builds".
-- Set service to the service name if mentioned.
-- Otherwise, set service to null.
+    For unrelated requests:
+    - Set action to "unknown".
+    - Set service to null.
 
-If the request is unrelated to listing failed builds:
-- Set action to "unknown".
-- Set service to null.
+    Return only the JSON object.
 
-Return only a JSON object with these keys:
-action, service
+    Developer request: {user_request}
+    """
+    if client is None:
+        raise RuntimeError(
+        "Gemini API key is missing. Add GEMINI_API_KEY to your .env file."
+        )
+    try:
+        response = client.models.generate_content(
+            model="gemini-flash-latest",
+            contents=prompt,
+            config={"response_mime_type": "application/json"},
+        )
+    except Exception as error:
+        raise RuntimeError("Gemini API request failed.") from error
+    
+    try:
+        if not response.text:
+            raise ValueError("Gemini returned an empty response.")
 
-Developer request: {user_request}
-"""
+        return json.loads(response.text)
 
-print("Sending one request to Gemini...", flush=True)
-
-response = client.models.generate_content(
-    model="gemini-flash-latest",
-    contents=prompt,
-    config={"response_mime_type": "application/json"}
-)
-
-# Convert Gemini's JSON response into Python data
-result = json.loads(response.text)
-
-# Normalize the service name to match our sample data
-if result.get("service") == "payment":
-    result["service"] = "payment-service"
-elif result.get("service") == "user":
-    result["service"] = "user-service"
-
-print("\nGemini understood your request:")
-print(json.dumps(result, indent=2))
+    except (json.JSONDecodeError, TypeError) as error:
+        raise ValueError(
+            "Gemini returned an invalid JSON response."
+        ) from error

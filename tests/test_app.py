@@ -1,5 +1,6 @@
 import app
-import pytest
+import understand_request
+import json
 
 
 # unsupported requests are rejected before the build tool runs.
@@ -33,8 +34,6 @@ def test_unknown_action_does_not_execute_tool(monkeypatch, capsys):
 
 # when Gemini returns malformed JSON, the JSON parsing error occurs before the build tool can execute.
 def test_invalid_json_does_not_execute_tool(monkeypatch, capsys):
-    import json
-
     class FakeResponse:
         text = "this is not valid JSON"
 
@@ -45,7 +44,7 @@ def test_invalid_json_does_not_execute_tool(monkeypatch, capsys):
     class FakeClient:
         models = FakeModels()
 
-    monkeypatch.setattr(app, "client", FakeClient())
+    monkeypatch.setattr(understand_request, "client", FakeClient())
 
     def unexpected_tool_call(service=None):
         raise AssertionError("The tool should not have been executed!")
@@ -62,7 +61,6 @@ def test_invalid_json_does_not_execute_tool(monkeypatch, capsys):
     assert "Could not understand the AI response" in output
 
 def test_gemini_api_failure_is_handled(monkeypatch, capsys):
-  
     def simulate_api_failure(**kwargs):
         raise Exception("Simulated network failure")
 
@@ -73,7 +71,7 @@ def test_gemini_api_failure_is_handled(monkeypatch, capsys):
     class FakeClient:
         models = FakeModels()
 
-    monkeypatch.setattr(app, "client", FakeClient())
+    monkeypatch.setattr(understand_request, "client", FakeClient())
 
     def unexpected_tool_call(service=None):
         raise AssertionError("The tool should not have been executed!")
