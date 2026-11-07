@@ -51,8 +51,10 @@ def test_analyze_failed_job_returns_explanation(monkeypatch):
     monkeypatch.setattr(
         log_analysis,
         "explain_job_issue",
-        lambda job, context: {
+        lambda job, context, classification: {
             "likely_cause": "Database unavailable",
+            "root_cause_category": "Infrastructure / Network",
+            "secondary_errors": [],
             "evidence": "ERROR: Connection refused",
             "suggested_fix": "Check the database service.",
             "confidence": "high",
@@ -71,6 +73,9 @@ def test_analyze_failed_job_returns_explanation(monkeypatch):
     assert result["needs_analysis"] is True
     assert "ERROR: Connection refused" in result["context"]
     assert result["explanation"]["likely_cause"] == "Database unavailable"
+    assert result["earliest_detected_category"] == "Infrastructure / Network"
+    assert result["root_cause_category"] == "Infrastructure / Network"
+
 
 
 def test_analyze_successful_warning_does_not_call_gemini(monkeypatch):
@@ -99,6 +104,8 @@ def test_analyze_successful_warning_does_not_call_gemini(monkeypatch):
     assert result["needs_analysis"] is False
     assert result["context"] is None
     assert result["explanation"] is None
+    assert result["earliest_detected_category"] == "Unknown"
+    assert result["matched_indicators"] == []
 
 
 def test_analyze_job_preserves_job_metadata(monkeypatch):
@@ -121,3 +128,87 @@ def test_analyze_job_preserves_job_metadata(monkeypatch):
     assert result["job_name"] == "unit-tests"
     assert result["status"] == "completed"
     assert result["conclusion"] == "success"
+    
+def test_analyze_failed_job_includes_failure_category(monkeypatch):
+    monkeypatch.setattr(
+        log_analysis,
+        "get_workflow_job_logs",
+        lambda job_id: "ERROR: Connection timed out",
+    )
+
+    monkeypatch.setattr(
+        log_analysis,
+        "explain_job_issue",
+        lambda job, context, classification: {
+            "likely_cause": "Network unavailable",
+             "root_cause_category": "Infrastructure / Network",
+            "secondary_errors": [],
+            "evidence": "Connection timed out",
+            "suggested_fix": "Check network connectivity.",
+            "confidence": "high",
+        },
+    )
+
+    job = {
+        "job_id": 126,
+        "name": "integration-tests",
+        "status": "completed",
+        "conclusion": "failure",
+    }
+
+    result = log_analysis.analyze_job_logs(job)
+
+    assert result["earliest_detected_category"] == "Infrastructure / Network"
+    assert result["root_cause_category"] == "Infrastructure / Network"
+    assert "Connection timed out" in result["matched_indicators"]
+    assert result["needs_analysis"] is True
+    
+def test_analyze_failed_job_passes_classification_to_gemini(monkeypatch):
+    captured = {}
+
+    monkeypatch.setattr(
+        log_analysis,
+        "get_workflow_job_logs",
+        lambda job_id: (
+            "ModuleNotFoundError: No module named 'requests'"
+        ),
+    )
+
+    def mock_explanation(job, context, classification):
+        captured["classification"] = classification
+
+        return {
+            "likely_cause": "Missing Python dependency",
+            "root_cause_category": "Dependency",
+            "secondary_errors": [],
+            "evidence": "ModuleNotFoundError",
+            "suggested_fix": "Install the missing dependency.",
+            "confidence": "high",
+        }
+
+    monkeypatch.setattr(
+        log_analysis,
+        "explain_job_issue",
+        mock_explanation,
+    )
+
+    job = {
+        "job_id": 127,
+        "name": "unit-tests",
+        "status": "completed",
+        "conclusion": "failure",
+    }
+
+    result = log_analysis.analyze_job_logs(job)
+
+    assert captured["classification"]["earliest_detected_category"] == "Dependency"
+
+    assert (
+        result["explanation"]["root_cause_category"]
+        == "Dependency"
+    )
+
+    assert (
+        result["explanation"]["likely_cause"]
+        == "Missing Python dependency"
+    )

@@ -149,60 +149,95 @@ def handle_request(user_request):
             print(f"Branch: {run['branch']}")
             print(f"URL: {run['url']}")
             
+    
     elif action == "analyze_latest_failed_workflow":
         if not tool_result["workflow"]:
             logger.info(tool_result["message"])
             print(f"\n{tool_result['message']}")
             return
-        
+
         workflow = tool_result["workflow"]
         jobs = tool_result["jobs"]
-        
+
         logger.info("Analyzed failed workflow run %s.", workflow["run_id"])
-        
-        print("\nTrustFlow AI — Workflow Analysis")
-        print(f"\nWorkflow: {workflow['name']}")
-        print(f"Run ID: {workflow['run_id']}")
-        print(f"Status: {workflow['status']}")
-        print(f"Conclusion: {workflow['conclusion']}")
-        print(f"Branch: {workflow['branch']}")
-        print(f"URL: {workflow['url']}")
-        
+
+        print("\n" + "=" * 60)
+        print("          TRUSTFLOW AI - WORKFLOW ANALYSIS")
+        print("=" * 60)
+
+        print(f"\nWorkflow       : {workflow['name']}")
+        print(f"Run ID         : {workflow['run_id']}")
+        print(f"Status         : {workflow['status']}")
+        print(f"Conclusion     : {workflow['conclusion']}")
+        print(f"Branch         : {workflow['branch']}")
+        print(f"URL            : {workflow['url']}")
+
         if not jobs:
             print("\nNo jobs were available to analyze.")
             return
-        
+
         for job in jobs:
-            print(f"\n{'=' * 50}")
-            print(f"Job: {job['job_name']}")
-            print(f"Status: {job['status']}")
-            print(f"Conclusion: {job['conclusion'] or 'Not completed'}")
+            print("\n" + "-" * 60)
+            print(f"JOB: {job['job_name']}")
+            print("-" * 60)
+
+            print(f"Job ID         : {job['job_id']}")
+            print(f"Status         : {job['status']}")
+            print(f"Conclusion     : {job['conclusion'] or 'Not completed'}")
 
             if not job["needs_analysis"]:
                 print("\nNo failure analysis needed for this job.")
                 continue
 
-            if job["context"]:
-                print("\nFailure Context:")
-                print(job["context"])
+            print("\nFailure Context:")
+            print(job["context"] or "No failure context available.")
 
-            explanation = job["explanation"]
+            print("\nFailure Classification:")
+            print(
+                f"Earliest Detected Category : "
+                f"{job['earliest_detected_category']}"
+            )
+            print(
+                f"Root Cause Category        : "
+                f"{job['root_cause_category']}"
+            )
 
-            if explanation:
-                print("\nLikely Cause:")
-                print(explanation["likely_cause"])
+            if job["matched_indicators"]:
+                print("\nMatched Indicators:")
+                for indicator in job["matched_indicators"]:
+                    print(f"- {indicator}")
 
-                print("\nEvidence:")
-                for item in explanation["evidence"]:
-                    print(f"- {item}")
+            explanation = job.get("explanation")
 
-                print("\nSuggested Fix:")
-                print(explanation["suggested_fix"])
+            if not explanation:
+                print("\nNo AI explanation available.")
+                continue
 
-                print(
-                    f"\nConfidence: "
-                    f"{explanation['confidence'].upper()}"
-                )
+            print("\nAI Root-Cause Analysis:")
+            print(f"Likely Cause : {explanation['likely_cause']}")
+
+            print("\nEvidence:")
+            print(explanation["evidence"])
+
+            print("\nSecondary Errors:")
+            if explanation["secondary_errors"]:
+                for error in explanation["secondary_errors"]:
+                    print(f"- {error}")
+            else:
+                print("No additional errors identified.")
+
+            print("\nSuggested Fix:")
+            print(explanation["suggested_fix"])
+
+            print(
+                f"\nConfidence   : "
+                f"{explanation['confidence'].upper()}"
+            )
+
+        print("\n" + "=" * 60)
+        print("             ANALYSIS COMPLETED")
+        print("=" * 60)
+
 
         
 

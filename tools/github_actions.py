@@ -13,7 +13,7 @@ def get_recent_workflow_runs(service=None):
     
     url = (
         "https://api.github.com/repos/"
-        "PallaviSatram/TrustFlowAI/actions/runs?per_page=5"
+        "PallaviSatram/TrustFlowAI/actions/runs?per_page=10"
     )
     
     request = Request(
