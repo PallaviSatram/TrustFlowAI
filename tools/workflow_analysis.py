@@ -1,10 +1,10 @@
 from .github_actions import get_recent_workflow_runs, get_workflow_jobs
 from .log_analysis import analyze_job_logs
 
-def analyze_latest_failed_workflow():
+def analyze_latest_failed_workflow(repo):
   """Analyze the most recent failed GitHub Actions workflow."""
   
-  runs = get_recent_workflow_runs()
+  runs = get_recent_workflow_runs(repo)
   
   failed_runs = [
     run for run in runs
@@ -21,10 +21,10 @@ def analyze_latest_failed_workflow():
   
   # Runs are returned newest first by GitHub's API
   workflow = failed_runs[0]
-  jobs = get_workflow_jobs(workflow["run_id"])
+  jobs = get_workflow_jobs(workflow["run_id"], repo)
   
   analyzed_jobs = [
-    analyze_job_logs(job)
+    analyze_job_logs(job, repo)
     for job in jobs
     if (
       job["conclusion"] == "failure" or 

@@ -46,7 +46,7 @@ def test_analyze_failed_job_returns_explanation(monkeypatch):
     monkeypatch.setattr(
         log_analysis,
         "get_workflow_job_logs",
-        lambda job_id: "ERROR: Connection refused",
+        lambda job_id, repo: "ERROR: Connection refused",
     )
     monkeypatch.setattr(
         log_analysis,
@@ -67,8 +67,9 @@ def test_analyze_failed_job_returns_explanation(monkeypatch):
         "status": "completed",
         "conclusion": "failure",
     }
+    repo = "PallaviSatram/TrustFlowAI"
 
-    result = log_analysis.analyze_job_logs(job)
+    result = log_analysis.analyze_job_logs(job, repo)
 
     assert result["needs_analysis"] is True
     assert "ERROR: Connection refused" in result["context"]
@@ -82,7 +83,7 @@ def test_analyze_successful_warning_does_not_call_gemini(monkeypatch):
     monkeypatch.setattr(
         log_analysis,
         "get_workflow_job_logs",
-        lambda job_id: "WARNING: Deprecated configuration",
+        lambda job_id, repo: "WARNING: Deprecated configuration",
     )
 
     def unexpected_gemini_call(job, context):
@@ -98,8 +99,9 @@ def test_analyze_successful_warning_does_not_call_gemini(monkeypatch):
         "status": "completed",
         "conclusion": "success",
     }
+    repo = "PallaviSatram/TrustFlowAI"
 
-    result = log_analysis.analyze_job_logs(job)
+    result = log_analysis.analyze_job_logs(job, repo)
 
     assert result["needs_analysis"] is False
     assert result["context"] is None
@@ -112,7 +114,7 @@ def test_analyze_job_preserves_job_metadata(monkeypatch):
     monkeypatch.setattr(
         log_analysis,
         "get_workflow_job_logs",
-        lambda job_id: "All checks passed",
+        lambda job_id, repo: "All checks passed",
     )
 
     job = {
@@ -121,8 +123,9 @@ def test_analyze_job_preserves_job_metadata(monkeypatch):
         "status": "completed",
         "conclusion": "success",
     }
+    repo = "PallaviSatram/TrustFlowAI"
 
-    result = log_analysis.analyze_job_logs(job)
+    result = log_analysis.analyze_job_logs(job, repo)
 
     assert result["job_id"] == 125
     assert result["job_name"] == "unit-tests"
@@ -133,7 +136,7 @@ def test_analyze_failed_job_includes_failure_category(monkeypatch):
     monkeypatch.setattr(
         log_analysis,
         "get_workflow_job_logs",
-        lambda job_id: "ERROR: Connection timed out",
+        lambda job_id, repo : "ERROR: Connection timed out"
     )
 
     monkeypatch.setattr(
@@ -155,8 +158,9 @@ def test_analyze_failed_job_includes_failure_category(monkeypatch):
         "status": "completed",
         "conclusion": "failure",
     }
+    repo = "PallaviSatram/TrustFlowAI"
 
-    result = log_analysis.analyze_job_logs(job)
+    result = log_analysis.analyze_job_logs(job, repo)
 
     assert result["earliest_detected_category"] == "Infrastructure / Network"
     assert result["root_cause_category"] == "Infrastructure / Network"
@@ -169,7 +173,7 @@ def test_analyze_failed_job_passes_classification_to_gemini(monkeypatch):
     monkeypatch.setattr(
         log_analysis,
         "get_workflow_job_logs",
-        lambda job_id: (
+        lambda job_id, repo: (
             "ModuleNotFoundError: No module named 'requests'"
         ),
     )
@@ -198,8 +202,9 @@ def test_analyze_failed_job_passes_classification_to_gemini(monkeypatch):
         "status": "completed",
         "conclusion": "failure",
     }
+    repo = "PallaviSatram/TrustFlowAI"
 
-    result = log_analysis.analyze_job_logs(job)
+    result = log_analysis.analyze_job_logs(job, repo)
 
     assert captured["classification"]["earliest_detected_category"] == "Dependency"
 

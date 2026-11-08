@@ -1,4 +1,5 @@
 import logging
+from tools.github_actions import validate_repository
 
 from understand_request import understand_request
 from tools.workflow_analysis import analyze_latest_failed_workflow
@@ -45,7 +46,7 @@ def normalize_service(service):
     return aliases.get(service, service)
 
 
-def handle_request(user_request):
+def handle_request(user_request, repo = "PallaviSatram/TrustFlowAI"):
     """Validate the AI result and run the appropriate Python tool."""
     
     logger.info("Processing a developer request.")
@@ -89,8 +90,10 @@ def handle_request(user_request):
     # Execute the selected tool.
     try:
         logger.info("Executing tool: %s", action)
-        if action == "analyze_latest_failed_workflow":
-            tool_result = tool_function()
+        if action in {"analyze_latest_failed_workflow",
+        "get_recent_workflow_runs"}:
+            repo = validate_repository(repo)
+            tool_result = tool_function(repo)
         else:
             tool_result = tool_function(service)
     except (ValueError, RuntimeError):
@@ -243,8 +246,11 @@ def handle_request(user_request):
 
 
 if __name__ == "__main__":
+    repo = input(
+        "TrustFlow AI — Enter GitHub repository (owner/repo): "
+    )
     request = input("TrustFlow AI — Enter a developer request: ")
     try:
-        handle_request(request)
+        handle_request(request, repo)
     except Exception as error:
         print("\nSomething went wrong:", error)

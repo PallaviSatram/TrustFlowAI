@@ -42,12 +42,12 @@ def test_latest_failed_workflow_is_analyzed(monkeypatch):
     monkeypatch.setattr(
         workflow_analysis,
         "get_recent_workflow_runs",
-        lambda: fake_runs,
+        lambda repo: fake_runs,
     )
 
     requested_run_ids = []
 
-    def fake_get_workflow_jobs(run_id):
+    def fake_get_workflow_jobs(run_id, repo):
         requested_run_ids.append(run_id)
         return fake_jobs
 
@@ -59,7 +59,7 @@ def test_latest_failed_workflow_is_analyzed(monkeypatch):
 
     analyzed_jobs = []
 
-    def fake_analyze_job_logs(job):
+    def fake_analyze_job_logs(job, repo):
         analyzed_jobs.append(job)
         return analyzed_job
 
@@ -68,9 +68,10 @@ def test_latest_failed_workflow_is_analyzed(monkeypatch):
         "analyze_job_logs",
         fake_analyze_job_logs,
     )
+    repo = "PallaviSatram/TrustFlowAI"
 
     # Act
-    result = workflow_analysis.analyze_latest_failed_workflow()
+    result = workflow_analysis.analyze_latest_failed_workflow(repo)
 
     # Assert
     assert result["workflow"]["run_id"] == 102
@@ -83,7 +84,7 @@ def test_no_failed_workflow_returns_helpful_message(monkeypatch):
     monkeypatch.setattr(
         workflow_analysis,
         "get_recent_workflow_runs",
-        lambda: [
+        lambda repo: [
             {
                 "run_id": 201,
                 "status": "completed",
@@ -97,7 +98,7 @@ def test_no_failed_workflow_returns_helpful_message(monkeypatch):
         ],
     )
 
-    def unexpected_job_call(run_id):
+    def unexpected_job_call(run_id, repo):
         pytest.fail("Jobs should not be fetched when no failed workflow exists")
 
     monkeypatch.setattr(
@@ -105,8 +106,9 @@ def test_no_failed_workflow_returns_helpful_message(monkeypatch):
         "get_workflow_jobs",
         unexpected_job_call,
     )
+    repo = "PallaviSatram/TrustFlowAI"
 
-    result = workflow_analysis.analyze_latest_failed_workflow()
+    result = workflow_analysis.analyze_latest_failed_workflow(repo)
 
     assert result["workflow"] is None
     assert result["jobs"] == []
@@ -116,7 +118,7 @@ def test_workflow_jobs_are_filtered_before_analysis(monkeypatch):
     monkeypatch.setattr(
         workflow_analysis,
         "get_recent_workflow_runs",
-        lambda: [
+        lambda repo: [
             {
                 "run_id": 303,
                 "status": "completed",
@@ -146,12 +148,12 @@ def test_workflow_jobs_are_filtered_before_analysis(monkeypatch):
     monkeypatch.setattr(
         workflow_analysis,
         "get_workflow_jobs",
-        lambda run_id: fake_jobs,
+        lambda run_id, repo: fake_jobs,
     )
 
     analyzed_job_names = []
 
-    def fake_analyze_job_logs(job):
+    def fake_analyze_job_logs(job, repo):
         analyzed_job_names.append(job["name"])
         return {"job_name": job["name"]}
 
@@ -160,8 +162,9 @@ def test_workflow_jobs_are_filtered_before_analysis(monkeypatch):
         "analyze_job_logs",
         fake_analyze_job_logs,
     )
+    repo = "PallaviSatram/TrustFlowAI"
 
-    result = workflow_analysis.analyze_latest_failed_workflow()
+    result = workflow_analysis.analyze_latest_failed_workflow(repo)
 
     assert analyzed_job_names == ["failed-test", "successful-test"]
     assert result["jobs"] == [

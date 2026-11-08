@@ -8,12 +8,35 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-def get_recent_workflow_runs(service=None):
+def validate_repository(repo):
+    """Validate a GitHub Repo in owe=ner/repo format."""
+    
+    if not isinstance(repo, str):
+        raise ValueError("Repository must be in owner/repo format.")
+    
+    repo = repo.strip()
+    parts = repo.split("/")
+    if(len(parts) != 2 or not all(parts) or any(
+        part in {".", ".."} or not all (
+            char.isalnum() or char in "-_."
+            for char in part
+        )
+        for part in parts
+    )
+    ):
+        raise ValueError(
+            "Invalid repository format. Use owner/repo."
+        )
+    return repo
+
+def get_recent_workflow_runs(repo, service=None):
     """Fetch recent workflow runs for the TrustFlow AI GitHub repository."""
     
+    repo = validate_repository(repo)
+    
     url = (
-        "https://api.github.com/repos/"
-        "PallaviSatram/TrustFlowAI/actions/runs?per_page=10"
+        f"https://api.github.com/repos/{repo}"
+        "/actions/runs?per_page=10"
     )
     
     request = Request(
@@ -51,14 +74,16 @@ def get_recent_workflow_runs(service=None):
     
     return runs
         
-def get_workflow_jobs(run_id):
+def get_workflow_jobs(run_id, repo):
     """Fetch jobs for a specific GitHub Actions workflow run."""
+    repo = validate_repository(repo)
+    
     if not isinstance(run_id, int) or isinstance(run_id, bool) or run_id <= 0:
         raise ValueError("run_id must be a positive integer.")
     
     url = (
-        "https://api.github.com/repos/"
-        f"PallaviSatram/TrustFlowAI/actions/runs/{run_id}/jobs"
+        f"https://api.github.com/repos/{repo}"
+        f"/actions/runs/{run_id}/jobs"
         "?per_page=100"
     )
     
@@ -97,8 +122,10 @@ def get_workflow_jobs(run_id):
     
     return jobs
 
-def get_workflow_job_logs(job_id):
+def get_workflow_job_logs(job_id, repo):
     """Retrieve plain-text logs for a GitHub Actions job."""
+    
+    repo = validate_repository(repo)
     
     token = os.getenv("GITHUB_TOKEN")
     
@@ -110,8 +137,8 @@ def get_workflow_job_logs(job_id):
         raise ValueError("job_id must be a positive integer.")
     
     url = (
-        "https://api.github.com/repos/"
-        "PallaviSatram/TrustFlowAI/actions/jobs/"
+        f"https://api.github.com/repos/{repo}"
+        "/actions/jobs/"
         f"{job_id}/logs"
     )
     
@@ -135,7 +162,6 @@ def get_workflow_job_logs(job_id):
     opener = build_opener(NoRedirectHandler)
     
     try:
-    
         try:
             with opener.open(request, timeout=20) as response:
                 logs = response.read().decode("utf-8", errors="replace",)

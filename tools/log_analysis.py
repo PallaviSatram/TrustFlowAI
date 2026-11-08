@@ -86,10 +86,10 @@ def should_analyze_job(job, logs):
 
 
 
-def analyze_job_logs(job):
+def analyze_job_logs(job, repo):
     """Retrieve and extract log context when a job needs analysis."""
 
-    logs = get_workflow_job_logs(job["job_id"])
+    logs = get_workflow_job_logs(job["job_id"], repo)
 
     result = {
         "job_id": job["job_id"],
